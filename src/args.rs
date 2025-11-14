@@ -5,6 +5,13 @@ use clap:: {
     Subcommand
 };
 
+/// The datetime format used in all calendar events
+#[derive(Debug, Args)]
+pub struct DateFormat {
+    pub start_datetime: String,
+    pub end_datetime: Option<String>
+}
+
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
 pub struct CalArgs {
@@ -14,18 +21,14 @@ pub struct CalArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum EventOptions {
-    /// Adds event to the calendar
-    Add(AddArgs)
+    /// Add event to your calendar
+    Add(AddArgs),
+    /// Edit an existing event in calendar
     // Use wild args to find name using regex
     // https://crates.io/crates/wild
-    // Edit {},
-    // View {}
-}
-
-#[derive(Debug, Args)]
-pub struct DateFormat {
-    pub start_datetime: String,
-    pub end_datetime: Option<String>
+    Edit(EditArgs),
+    /// View calendar events
+    View(ViewArgs)
 }
 
 #[derive(Debug, Args)]
@@ -33,4 +36,14 @@ pub struct AddArgs {
     pub title: String,
     #[command(flatten)]
     pub date: DateFormat
+}
+
+#[derive(Debug, Args)]
+pub struct EditArgs {
+
+}
+
+#[derive(Debug, Args)]
+pub struct ViewArgs {
+
 }
