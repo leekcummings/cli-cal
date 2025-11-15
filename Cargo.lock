@@ -175,6 +175,7 @@ dependencies = [
  "chrono-tz",
  "clap",
  "dateparser",
+ "regex",
 ]
 
 [[package]]

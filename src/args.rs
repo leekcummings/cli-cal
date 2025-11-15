@@ -6,11 +6,11 @@ use clap:: {
 };
 
 /// The datetime format used in all calendar events
-#[derive(Debug, Args)]
-pub struct DateFormat {
-    pub start_datetime: String,
-    pub end_datetime: Option<String>
-}
+// #[derive(Debug, Args)]
+// pub struct DateFormat {
+//     pub start_datetime: String,
+//     pub end_datetime: Option<String>
+// }
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
@@ -34,8 +34,11 @@ pub enum EventOptions {
 #[derive(Debug, Args)]
 pub struct AddArgs {
     pub title: String,
-    #[command(flatten)]
-    pub date: DateFormat
+    // Removed temp because I might need a different approach
+    // #[command(flatten)]
+    // pub date: DateFormat
+    #[clap(num_args=1..=10, allow_hyphen_values=true)]
+    pub datetimes: Vec<String>,
 }
 
 #[derive(Debug, Args)]
