@@ -2,15 +2,22 @@
 use clap:: {
     Args,
     Parser,
-    Subcommand
+    Subcommand, builder::{Str, ValueParser}
 };
 
-/// The datetime format used in all calendar events
-// #[derive(Debug, Args)]
-// pub struct DateFormat {
-//     pub start_datetime: String,
-//     pub end_datetime: Option<String>
-// }
+use chrono::prelude::*;
+use dateparser::{parse_with};
+
+use regex::Regex;
+
+/// Default time for calendar events set to 02:00:00.000...
+// Hopefully no one will be awake adding to their calendar at that millisecond
+const DEFAULT_TIME: NaiveTime = NaiveTime::from_hms_opt(1, 59, 59).unwrap();
+
+fn date_parse(raw_date: &str) -> Result<chrono::DateTime<Utc>, anyhow::Error> {
+    println!("{}", &raw_date);
+    parse_with(raw_date, &Utc, DEFAULT_TIME)
+}
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
@@ -34,9 +41,6 @@ pub enum EventOptions {
 #[derive(Debug, Args)]
 pub struct AddArgs {
     pub title: String,
-    // Removed temp because I might need a different approach
-    // #[command(flatten)]
-    // pub date: DateFormat
     #[clap(num_args=1..=10, allow_hyphen_values=true)]
     pub datetimes: Vec<String>,
 }
