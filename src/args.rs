@@ -2,22 +2,14 @@
 use clap:: {
     Args,
     Parser,
-    Subcommand, builder::{Str, ValueParser}
+    Subcommand
 };
 
-use chrono::prelude::*;
-use dateparser::{parse_with};
-
-use regex::Regex;
-
-/// Default time for calendar events set to 02:00:00.000...
-// Hopefully no one will be awake adding to their calendar at that millisecond
-const DEFAULT_TIME: NaiveTime = NaiveTime::from_hms_opt(1, 59, 59).unwrap();
-
-fn date_parse(raw_date: &str) -> Result<chrono::DateTime<Utc>, anyhow::Error> {
-    println!("{}", &raw_date);
-    parse_with(raw_date, &Utc, DEFAULT_TIME)
-}
+// Not using this I think unless I can get multiple clap arguments into here at once
+// fn date_parse(raw_date: &str) -> Result<chrono::DateTime<Utc>, anyhow::Error> {
+//     println!("{}", &raw_date);
+//     parse_with(raw_date, &Utc, DEFAULT_TIME)
+// }
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
@@ -43,6 +35,13 @@ pub struct AddArgs {
     pub title: String,
     #[clap(num_args=1..=10, allow_hyphen_values=true)]
     pub datetimes: Vec<String>,
+    #[clap(short)]
+    pub location: Option<String>,
+    /// Make event daily, weekly, or monthly
+    #[clap(short)]
+    pub repeat: Option<String>,
+    #[clap(short, num_args=1..)]
+    pub description: Option<String>
 }
 
 #[derive(Debug, Args)]
