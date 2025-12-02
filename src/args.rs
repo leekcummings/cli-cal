@@ -33,7 +33,7 @@ pub enum EventOptions {
 #[derive(Debug, Args)]
 pub struct AddArgs {
     pub title: String,
-    #[clap(num_args=1..=10, allow_hyphen_values=true)]
+    #[clap(num_args=1..=10)]
     pub datetimes: Vec<String>,
     #[clap(short)]
     pub location: Option<String>,

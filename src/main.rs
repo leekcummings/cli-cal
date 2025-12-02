@@ -29,7 +29,7 @@ fn main() -> Result<(), String> {
         EventOptions::Add(args) => {
             let joined_dates: String = args.datetimes.join(" "); 
             let mut dates: Vec<DateTime<Local>> = Vec::new();
-            let re: Regex = Regex::new(r"^(?:(.+[^\s])\s*-\s*(.+)|((.+[^-^\s])))$").unwrap();
+            let re: Regex = Regex::new(r"^(?:(.+[^\s])\s*,\s*(.+)|((.+[^,^\s])))$").unwrap();
             // I just learned how to declare variables in an if statement, is it obvious?
             if let Some(caps) = re.captures(&joined_dates) {
                 for i in 1..=3 {
@@ -52,9 +52,9 @@ fn main() -> Result<(), String> {
                 } else {
                     println!("Start Date: {}", dates[0]);
                 }
-                println!("Location: {:?}", &args.location);
-                println!("Repeating: {:?}", &args.repeat);
-                println!("Description: {:?}", &args.description);
+                println!("Location: {}", &args.location.clone().unwrap_or("None".to_string()));
+                println!("Repeating: {}", &args.repeat.clone().unwrap_or("None".to_string()));
+                println!("Description: {}", &args.description.clone().unwrap_or("None".to_string()));
                 // I/O based on https://www.geeksforgeeks.org/rust/standard-i-o-in-rust/
                 println!("Would you like to add this event to your calendar? Y/N");
                 let mut guess = String::new();
