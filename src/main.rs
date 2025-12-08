@@ -1,12 +1,13 @@
 mod args;
 
+use chrono::prelude::*;
 // Use clap for CLI argument parsing
 use clap::Parser;
-use chrono::prelude::*;
+use csv::WriterBuilder;
 // Use dateparser for chrono datetime parsing
 use dateparser::{parse_with};
 use regex::Regex;
-use std::io;
+use std::{fs::{self, File, OpenOptions}, io};
 
 use crate::args::{CalArgs, EventOptions};
 
@@ -14,19 +15,24 @@ use crate::args::{CalArgs, EventOptions};
 // Hopefully no one will be awake adding to their calendar at that millisecond
 const DEFAULT_TIME: NaiveTime = NaiveTime::from_hms_opt(1, 59, 59).unwrap();
 
-// struct CalendarEvent {
-//     title: String,
-//     start_date: DateTime<Local>,
-//     end_date: DateTime<Local>,
-//     location: Option<String>,
-//     repeat: Option<String>,
-//     description: Option<String>
-// }
+// Object to be appended to CSV
+#[derive(serde::Serialize)]
+struct CalendarEvent {
+    title: String,
+    start_date: String,
+    end_date: String,
+    location: String,
+    repeat: String,
+    description: String
+}
 
 fn main() -> Result<(), String> {
     let cli = CalArgs::parse();
+    // Switch case for each of the available CLI options
     match &cli.event {
+        // ADD TO CALENDAR
         EventOptions::Add(args) => {
+            // Parsing String into DateTimes
             let joined_dates: String = args.datetimes.join(" "); 
             let mut dates: Vec<DateTime<Local>> = Vec::new();
             let re: Regex = Regex::new(r"^(?:(.+[^\s])\s*,\s*(.+)|((.+[^,^\s])))$").unwrap();
@@ -39,29 +45,64 @@ fn main() -> Result<(), String> {
                     }
                 }
             }
+            // End of parsing DateTimes
             // If no dates are found in CLI input, exit
             if dates.is_empty() {
                 let err: String = format!("No date(s) found in string `{joined_dates}`");
                 Err(err)
             } else {
-                // Print a bunch of info to confirm that the event is correct
-                println!("=== Event Details ===\nTitle: {}", &args.title);
-                println!("Start Date: {}", dates[0]);
+                // Does the event end of the same day or on a different day?
+                let mut end: String = String::new();
+                // Different Day
                 if dates.len() > 1 {
-                    println!("Start Date: {}", dates[1]);
+                    end = dates[1].to_string();
+                // Same Day
                 } else {
-                    println!("Start Date: {}", dates[0]);
+                    end = dates[0].to_string();
                 }
-                println!("Location: {}", &args.location.clone().unwrap_or("None".to_string()));
-                println!("Repeating: {}", &args.repeat.clone().unwrap_or("None".to_string()));
-                println!("Description: {}", &args.description.clone().unwrap_or("None".to_string()));
+                // Create calendar event to add to csv
+                let e: CalendarEvent = CalendarEvent {
+                    title: args.title.clone(),
+                    start_date: dates[0].to_string(),
+                    end_date: end.clone(),
+                    location: args.location.clone().unwrap_or("None".to_string()),
+                    repeat: args.repeat.clone().unwrap_or("None".to_string()),
+                    description: args.description.clone().unwrap_or("None".to_string())
+                };
+                // Print a bunch of info to confirm that the event is correct
+                println!("=== Event Details ===\nTitle: {}", e.title);
+                println!("Start Date: {}", e.start_date);
+                println!("End Date: {}", e.end_date);
+                println!("Location: {}", e.location);
+                println!("Repeating: {}", e.repeat);
+                println!("Description: {}", e.description);
                 // I/O based on https://www.geeksforgeeks.org/rust/standard-i-o-in-rust/
                 println!("Would you like to add this event to your calendar? Y/N");
-                let mut guess = String::new();
-                io::stdin().read_line(&mut guess).expect("Failed to readline");
-                if guess.to_lowercase() == "y" {
-                    // add to csv file
+                let mut response = String::new();
+                io::stdin().read_line(&mut response).expect("Failed to readline");
+
+                if response.to_lowercase() == "y\n" {
+                    // Check that save file exists
+                    let file_name = "events.csv";
+                    // If the file doesn't exist
+                    if !fs::exists(file_name).unwrap() {
+                        let mut file = File::create(file_name).unwrap();
+                        // Big difference: Add a header to the csv
+                        let mut wtr = WriterBuilder::new()
+                            .has_headers(true)
+                            .from_writer(file);
+                        wtr.serialize(e);
+                    // If the file exists
+                    } else {
+                        // Open file in APPEND mode to not overwrite
+                        let file: File = OpenOptions::new().append(true).open(file_name).unwrap();
+                        let mut wtr = WriterBuilder::new()
+                            .has_headers(false)
+                            .from_writer(file);
+                        wtr.serialize(e);
+                    }
                 }
+                // Everything worked!
                 Ok(())
             } 
         }
