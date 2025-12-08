@@ -13,3 +13,7 @@ csv = "1.4.0"
 dateparser = "0.2.1"
 regex = "1.12.2"
 serde = { version = "1.0.228", features = ["derive"] }
+
+[[bin]]
+name = "crust"
+path = "src/main.rs"
