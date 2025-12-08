@@ -3,9 +3,10 @@ mod args;
 use chrono::prelude::*;
 // Use clap for CLI argument parsing
 use clap::Parser;
-use csv::WriterBuilder;
+use colored::Colorize;
+use csv::{ReaderBuilder, WriterBuilder};
 // Use dateparser for chrono datetime parsing
-use dateparser::{parse_with};
+use dateparser::{parse, parse_with};
 use regex::Regex;
 use std::{fs::{self, File, OpenOptions}, io};
 
@@ -14,9 +15,11 @@ use crate::args::{CalArgs, EventOptions};
 /// Default time for calendar events set to 02:00:00.000...
 // Hopefully no one will be awake adding to their calendar at that millisecond
 const DEFAULT_TIME: NaiveTime = NaiveTime::from_hms_opt(1, 59, 59).unwrap();
+// Default save file name
+const FILE_NAME: &str = "events.csv";
 
 // Object to be appended to CSV
-#[derive(serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct CalendarEvent {
     title: String,
     start_date: String,
@@ -52,41 +55,48 @@ fn main() -> Result<(), String> {
                 Err(err)
             } else {
                 // Does the event end of the same day or on a different day?
-                let mut end: String = String::new();
+                let mut end:DateTime<Local> = Local::now();
                 // Different Day
                 if dates.len() > 1 {
-                    end = dates[1].to_string();
+                    end = dates[1];
                 // Same Day
                 } else {
-                    end = dates[0].to_string();
+                    end = dates[0];
+                }
+                // If the end is earlier than the start, fix it
+                // this 1 if expression from ChatGPT
+                if end < dates[0] {
+                    let date = dates[0].date_naive();
+                    let time = end.time();
+                    end = Local.from_local_datetime(&(date.and_time(time)))
+                        .earliest()
+                        .expect("Invalid local datetime");
                 }
                 // Create calendar event to add to csv
                 let e: CalendarEvent = CalendarEvent {
                     title: args.title.clone(),
                     start_date: dates[0].to_string(),
-                    end_date: end.clone(),
+                    end_date: end.to_string(),
                     location: args.location.clone().unwrap_or("None".to_string()),
                     repeat: args.repeat.clone().unwrap_or("None".to_string()),
                     description: args.description.clone().unwrap_or("None".to_string())
                 };
                 // Print a bunch of info to confirm that the event is correct
-                println!("=== Event Details ===\nTitle: {}", e.title);
-                println!("Start Date: {}", e.start_date);
-                println!("End Date: {}", e.end_date);
-                println!("Location: {}", e.location);
-                println!("Repeating: {}", e.repeat);
-                println!("Description: {}", e.description);
+                println!("=== Event Details ===\nTitle: {}", e.title.green());
+                println!("Start Date: {}", e.start_date.green());
+                println!("End Date: {}", e.end_date.green());
+                println!("Location: {}", e.location.green());
+                println!("Repeating: {}", e.repeat.green());
+                println!("Description: {}", e.description.green());
                 // I/O based on https://www.geeksforgeeks.org/rust/standard-i-o-in-rust/
                 println!("Would you like to add this event to your calendar? Y/N");
                 let mut response = String::new();
                 io::stdin().read_line(&mut response).expect("Failed to readline");
 
                 if response.to_lowercase() == "y\n" {
-                    // Check that save file exists
-                    let file_name = "events.csv";
                     // If the file doesn't exist
-                    if !fs::exists(file_name).unwrap() {
-                        let mut file = File::create(file_name).unwrap();
+                    if !fs::exists(FILE_NAME).unwrap() {
+                        let mut file = File::create(FILE_NAME).unwrap();
                         // Big difference: Add a header to the csv
                         let mut wtr = WriterBuilder::new()
                             .has_headers(true)
@@ -95,7 +105,7 @@ fn main() -> Result<(), String> {
                     // If the file exists
                     } else {
                         // Open file in APPEND mode to not overwrite
-                        let file: File = OpenOptions::new().append(true).open(file_name).unwrap();
+                        let file: File = OpenOptions::new().append(true).open(FILE_NAME).unwrap();
                         let mut wtr = WriterBuilder::new()
                             .has_headers(false)
                             .from_writer(file);
@@ -105,6 +115,48 @@ fn main() -> Result<(), String> {
                 // Everything worked!
                 Ok(())
             } 
+        },
+        EventOptions::View(args) => {
+            // Open file based on https://docs.rs/csv/latest/csv/struct.ReaderBuilder.html
+            let mut rdr = ReaderBuilder::new().from_path(FILE_NAME).unwrap();
+            let mut events: Vec<CalendarEvent> = Vec::new();
+            for result in rdr.deserialize() {
+                let event: CalendarEvent = result.unwrap();
+                events.push(event);
+            }
+            // Sort Events By Date
+            events.sort_by_key(|x: &CalendarEvent| x.start_date.clone());
+            let today = Local::now();
+            let mut prev_date = parse(&events.get(0).unwrap().start_date).unwrap().with_timezone(&Local);
+            if args.all.unwrap() {
+                println!("{}", prev_date.format("%m-%d-%Y").to_string().blue().bold());
+            } else {
+                println!("{}", today.format("%m-%d-%Y").to_string().blue().bold());
+            }
+            for event in &events {
+                let current_date = parse(&event.start_date).unwrap().with_timezone(&Local);
+                if args.all.unwrap() {
+                    if prev_date.year() == current_date.year() && prev_date.month() == current_date.month() && prev_date.day() == current_date.day() {
+                        // Pass
+                    } else {
+                        let print_date = current_date.format("%m-%d-%Y").to_string().blue().bold();
+                        println!("\n{}", print_date);
+                        prev_date = current_date;
+                    }
+                    println!("{}-{}: {}", 
+                        current_date.format("%H:%M").to_string().purple(),
+                        parse(&event.end_date).unwrap().with_timezone(&Local).format("%H:%M").to_string().purple(),
+                        event.title);
+                } else {
+                    if today.year() == current_date.year() && today.month() == current_date.month() && today.day() == current_date.day() {
+                        println!("{}-{}: {}", 
+                        current_date.format("%H:%M").to_string().purple(),
+                        parse(&event.end_date).unwrap().with_timezone(&Local).format("%H:%M").to_string().purple(),
+                        event.title);
+                    }
+                }
+            }
+            Ok(())
         }
         _ => {Ok(())}
     }

@@ -2,7 +2,8 @@
 use clap:: {
     Args,
     Parser,
-    Subcommand
+    Subcommand,
+    ArgAction
 };
 
 // Not using this I think unless I can get multiple clap arguments into here at once
@@ -32,14 +33,18 @@ pub enum EventOptions {
 
 #[derive(Debug, Args)]
 pub struct AddArgs {
+    // The title of the event
     pub title: String,
+    // The start and end time, separated by a comma
     #[clap(num_args=1..=10)]
     pub datetimes: Vec<String>,
+    // The location of your event
     #[clap(short)]
     pub location: Option<String>,
-    /// Make event daily, weekly, or monthly
+    /// Make event daily, weekly, or monthly (currently not working)
     #[clap(short)]
     pub repeat: Option<String>,
+    // Add an option description for the event
     #[clap(short, num_args=1..)]
     pub description: Option<String>
 }
@@ -51,5 +56,7 @@ pub struct EditArgs {
 
 #[derive(Debug, Args)]
 pub struct ViewArgs {
-
+    // Show all available events
+    #[clap(short, action=ArgAction::SetTrue)]
+    pub all: Option<bool>
 }
