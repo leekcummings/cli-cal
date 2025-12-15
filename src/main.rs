@@ -8,7 +8,7 @@ use csv::{ReaderBuilder, WriterBuilder};
 // Use dateparser for chrono datetime parsing
 use dateparser::{parse, parse_with};
 use regex::Regex;
-use std::{fs::{self, File, OpenOptions}, io};
+use std::{env::{var, set_current_dir}, fs::{self, File, OpenOptions}, io, path::Path};
 
 use crate::args::{CalArgs, EventOptions};
 
@@ -29,12 +29,76 @@ struct CalendarEvent {
     description: String
 }
 
+// More extensive, can handle additional arguments
+fn view_calendar(all: Option<bool>, repeat: Option<bool>, location: Option<bool>) {
+    // Open file based on https://docs.rs/csv/latest/csv/struct.ReaderBuilder.html
+    let mut rdr = ReaderBuilder::new().from_path(FILE_NAME).unwrap();
+    let mut events: Vec<CalendarEvent> = Vec::new();
+    for result in rdr.deserialize() {
+        let event: CalendarEvent = result.unwrap();
+        events.push(event);
+    }
+    // Sort Events By Date
+    events.sort_by_key(|x: &CalendarEvent| x.start_date.clone());
+    let today = Local::now();
+    let mut prev_date = parse(&events.get(0).unwrap().start_date).unwrap().with_timezone(&Local);
+    if all.unwrap() {
+        println!("{}", prev_date.format("%m-%d-%Y").to_string().blue().bold());
+    } else {
+        println!("{}", today.format("%m-%d-%Y").to_string().blue().bold());
+    }
+    for event in &events {
+        let current_date: DateTime<Local> = parse(&event.start_date).unwrap().with_timezone(&Local);
+        if all.unwrap() {
+            if prev_date.year() == current_date.year() && prev_date.month() == current_date.month() && prev_date.day() == current_date.day() {
+                // Pass
+            } else {
+                let print_date = current_date.format("%m-%d-%Y").to_string().blue().bold();
+                println!("\n{}", print_date);
+                prev_date = current_date;
+            }
+            print!("{} - {}: {}", 
+                current_date.format("%H:%M").to_string().purple(),
+                parse(&event.end_date).unwrap().with_timezone(&Local).format("%H:%M").to_string().purple(),
+                event.title);
+        } else {
+            if today.year() == current_date.year() && today.month() == current_date.month() && today.day() == current_date.day() {
+                print!("{} - {}: {}", 
+                current_date.format("%H:%M").to_string().purple(),
+                parse(&event.end_date).unwrap().with_timezone(&Local).format("%H:%M").to_string().purple(),
+                event.title);
+            }
+        }
+        // Print these things only if they're selected
+        if location.unwrap() {
+            if event.location != "None" {
+                print!(" ({})", event.location.yellow());
+            }
+        }
+        if repeat.unwrap() {
+            if event.repeat != "None" {
+                print!(", repeats {}", event.repeat.yellow());
+            }
+        }
+        if today.year() == current_date.year() && today.month() == current_date.month() && today.day() == current_date.day() {
+            print!("\n");
+        } else if all.unwrap() {
+            print!("\n");
+        }
+    }
+}
+
 fn main() -> Result<(), String> {
+    // Moving around dirs to get to save file
+    let home = var("HOME").unwrap();
+    let _ = set_current_dir(home);
+    let file_path: &Path = Path::new("Coding/CS330/cli-cal/");
+    let _ = set_current_dir(file_path);
     let cli = CalArgs::parse();
     // Switch case for each of the available CLI options
     match &cli.event {
         // ADD TO CALENDAR
-        EventOptions::Add(args) => {
+        Some(EventOptions::Add(args)) => {
             // Parsing String into DateTimes
             let joined_dates: String = args.datetimes.join(" "); 
             let mut dates: Vec<DateTime<Local>> = Vec::new();
@@ -55,7 +119,7 @@ fn main() -> Result<(), String> {
                 Err(err)
             } else {
                 // Does the event end of the same day or on a different day?
-                let mut end:DateTime<Local> = Local::now();
+                let mut end: DateTime<Local> = Local::now();
                 // Different Day
                 if dates.len() > 1 {
                     end = dates[1];
@@ -98,12 +162,12 @@ fn main() -> Result<(), String> {
                 if response.to_lowercase() == "y\n" {
                     // If the file doesn't exist
                     if !fs::exists(FILE_NAME).unwrap() {
-                        let mut file = File::create(FILE_NAME).unwrap();
+                        let file = File::create(FILE_NAME).unwrap();
                         // Big difference: Add a header to the csv
                         let mut wtr = WriterBuilder::new()
                             .has_headers(true)
                             .from_writer(file);
-                        wtr.serialize(e);
+                        let _ = wtr.serialize(e);
                     // If the file exists
                     } else {
                         // Open file in APPEND mode to not overwrite
@@ -111,70 +175,19 @@ fn main() -> Result<(), String> {
                         let mut wtr = WriterBuilder::new()
                             .has_headers(false)
                             .from_writer(file);
-                        wtr.serialize(e);
+                        let _ = wtr.serialize(e);
                     }
                 }
                 // Everything worked!
                 Ok(())
             } 
         },
-        EventOptions::View(args) => {
-            // Open file based on https://docs.rs/csv/latest/csv/struct.ReaderBuilder.html
-            let mut rdr = ReaderBuilder::new().from_path(FILE_NAME).unwrap();
-            let mut events: Vec<CalendarEvent> = Vec::new();
-            for result in rdr.deserialize() {
-                let event: CalendarEvent = result.unwrap();
-                events.push(event);
-            }
-            // Sort Events By Date
-            events.sort_by_key(|x: &CalendarEvent| x.start_date.clone());
-            let today = Local::now();
-            let mut prev_date = parse(&events.get(0).unwrap().start_date).unwrap().with_timezone(&Local);
-            if args.all.unwrap() {
-                println!("{}", prev_date.format("%m-%d-%Y").to_string().blue().bold());
-            } else {
-                println!("{}", today.format("%m-%d-%Y").to_string().blue().bold());
-            }
-            for event in &events {
-                let current_date = parse(&event.start_date).unwrap().with_timezone(&Local);
-                if args.all.unwrap() {
-                    if prev_date.year() == current_date.year() && prev_date.month() == current_date.month() && prev_date.day() == current_date.day() {
-                        // Pass
-                    } else {
-                        let print_date = current_date.format("%m-%d-%Y").to_string().blue().bold();
-                        println!("\n{}", print_date);
-                        prev_date = current_date;
-                    }
-                    print!("{}-{}: {}", 
-                        current_date.format("%H:%M").to_string().purple(),
-                        parse(&event.end_date).unwrap().with_timezone(&Local).format("%H:%M").to_string().purple(),
-                        event.title);
-                } else {
-                    if today.year() == current_date.year() && today.month() == current_date.month() && today.day() == current_date.day() {
-                        print!("{}-{}: {}", 
-                        current_date.format("%H:%M").to_string().purple(),
-                        parse(&event.end_date).unwrap().with_timezone(&Local).format("%H:%M").to_string().purple(),
-                        event.title);
-                    }
-                }
-                // Print these things only if they're selected
-                if args.location.unwrap() {
-                    if event.location != "None" {
-                        print!(" ({})", event.location);
-                    }
-                }
-                if args.repeat.unwrap() {
-                    if event.repeat != "None" {
-                        print!(", repeats {}", event.repeat);
-                    }
-                }
-                if today.year() == current_date.year() && today.month() == current_date.month() && today.day() == current_date.day() {
-                    print!("\n");
-                } else if args.all.unwrap() {
-                    print!("\n");
-                }
-                
-            }
+        Some(EventOptions::View(args)) => {
+            view_calendar(args.all, args.repeat, args.location);
+            Ok(())
+        },
+        None => {
+            view_calendar(cli.all, cli.repeat, cli.location);
             Ok(())
         }
         _ => {Ok(())}

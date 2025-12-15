@@ -1,16 +1,22 @@
 // Used this video as main reference https://www.youtube.com/watch?v=fD9ptABVQbI
 use clap:: {
     Args,
+    ArgAction,
     Parser,
-    Subcommand,
-    ArgAction
+    Subcommand
 };
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
 pub struct CalArgs {
     #[clap(subcommand)]
-    pub event: EventOptions
+    pub event: Option<EventOptions>,
+    #[clap(short, action=ArgAction::SetTrue, help="Show all available events")]
+    pub all: Option<bool>,
+    #[clap(short, action=ArgAction::SetTrue, help="Show event locations")]
+    pub location: Option<bool>,
+    #[clap(short, action=ArgAction::SetTrue, help="Show event repeats")]
+    pub repeat: Option<bool>
 }
 
 #[derive(Debug, Subcommand)]
